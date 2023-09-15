@@ -1,6 +1,8 @@
-# nhentai download tools
+# torrent download tools
 
 A simple download tools for BitTorrent
+
+It is suggested to use this with [Book Reader](https://github.com/LittleOrange666/Book_Reader)
 
 ## Installation
 
