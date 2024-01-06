@@ -13,9 +13,8 @@
 (function() {
     'use strict';
     const downloader = "http://127.0.0.1:7777"; // downloader url
-    const min_pages = 15; // 小於一定頁數重新random
-    const pattern = new RegExp("[\u4E00-\u9FA5]+");
-    const lang_code = "29963";
+    const min_pages = 15; // random will skip books that less than [min_pages] pages
+    const lang_code = "29963"; // key to filter the language of books, chinese = 29963, english = 12227, japanese = 6346
     const random_buffer = 10;
     function pure(s){
         while (s.indexOf("[")!=-1){

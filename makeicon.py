@@ -22,7 +22,7 @@ Any2Ico_path = 'Quick_Any2Ico.exe'
 ext = ["jpg", "jpeg", "png", "gif", "icns", "ico"]
 datf = "dat.json"
 
-if True:
+if __name__ == "__main__":
     root = root.strip('"').strip("'")
     print('--->', root)
     with open(datf) as f:
@@ -39,6 +39,8 @@ if True:
         if not dirnames and os.path.getctime(parent) > ot:
             print(parent)
             first = min(p for p in os.listdir(parent) if p.split(".")[-1].lower() in ext)
+            if os.path.exists('{0}/icon.ico'.format(parent)):
+                os.remove('{0}/icon.ico'.format(parent))
             cmd = '"{0}" "-img={1}\\{2}" "-icon={1}\\icon.ico"'.format(Any2Ico_path, parent, first)
             subprocess.run(cmd)
             win32api.SetFileAttributes('{0}/icon.ico'.format(parent), win32con.FILE_ATTRIBUTE_HIDDEN)

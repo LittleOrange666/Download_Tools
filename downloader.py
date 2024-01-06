@@ -106,6 +106,8 @@ def download(trying=False):
             hashes.append(tor.info_hash)
         except BencodeDecodingError:
             return Response(response="Cookie may be expired, please update it and try again", status=200)
+        except json.decoder.JSONDecodeError:
+            return Response(response="Some Error occured, this could be caused by requests with too short intervals", status=200)
         cmd = f"qbt torrent add file \"{filename}\""
         print(cmd)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -129,7 +131,7 @@ def download(trying=False):
                         print("try opening Bittorrent")
                         time.sleep(3)
                         return download(True)
-
+            print(out)
             return Response(response=res, status=200)
         lasttime = time.time()
         return Response(status=204)
