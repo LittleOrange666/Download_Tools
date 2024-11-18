@@ -5,10 +5,13 @@ import time
 import shutil
 import requests
 import subprocess
+import re
 
 import win32api
 import win32con
 
+import traceback
+from multiprocessing import Process, Lock
 os.chdir(os.path.dirname(__file__))
 with open("book_dictionary", encoding="utf8") as f:
     root = f.read()
@@ -20,13 +23,18 @@ from flask_apscheduler import APScheduler
 from torrentool.api import Torrent
 from torrentool.exceptions import BencodeDecodingError
 from multiprocessing import Process, Queue
-
+lock = Lock()
 app = Flask(__name__)
 lasttime = -1
 qbittorrent = r'"C:\Program Files\qBittorrent\qbittorrent.exe"'
 book_reader = r"..\Book_Reader"
 q = Queue()
 hashes = []
+
+def secure_filename(v):
+    for ch in r'\/:*?"<>|':
+        v = v.replace(ch, "_")
+    return v
 
 
 def thread_func(q: Queue):
@@ -76,16 +84,19 @@ def download(trying=False):
             "User-Agent": request.form['UserAgent']
         }
         response = requests.get(url, headers=headers)
+        if response.status_code == 403:
+            return Response(response="Cookie may be expired, please update it and try again", status=200)
+        elif response.status_code != 200:
+            return Response(response=f"link {url!r} get {response.status_code} response", status=200)
         try:
             open(filename, "wb").write(response.content)
         except PermissionError:
             print("Action failed, pass it")
             return Response(status=204)
+        lock.acquire()
         try:
             tor = Torrent.from_file(filename)
-            fname = tor.name
-            for ch in r'\/:*?"<>|':
-                fname = fname.replace(ch, "_")
+            fname = secure_filename(tor.name)
             folder_name = os.path.join(root, fname)
             if os.path.isdir(folder_name):
                 print("Removing old torrent")
@@ -95,6 +106,8 @@ def download(trying=False):
                 except PermissionError:
                     print("Remove failed, pass it")
                     return Response(status=204)
+                except FileNotFoundError:
+                    pass
             with open("codes.json") as f:
                 obj = json.load(f)
             obj[source] = tor.name
@@ -104,10 +117,17 @@ def download(trying=False):
             with open(os.path.join(book_reader,"codes.json"), "w") as f:
                 json.dump(obj, f, indent=2, sort_keys=True)
             hashes.append(tor.info_hash)
-        except BencodeDecodingError:
-            return Response(response="Cookie may be expired, please update it and try again", status=200)
+        except BencodeDecodingError as e:
+            traceback.print_exception(e)
+            lock.release()
+            return Response(response="Fail to analyze torrent file", status=200)
         except json.decoder.JSONDecodeError:
+            lock.release()
             return Response(response="Some Error occured, this could be caused by requests with too short intervals", status=200)
+        except BaseException:
+            lock.release()
+            raise
+        lock.release()
         cmd = f"qbt torrent add file \"{filename}\""
         print(cmd)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

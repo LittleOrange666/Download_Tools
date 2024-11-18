@@ -30,17 +30,21 @@ if __name__ == "__main__":
             error = True
         if error:
             print("Error: "+folder)
+            folder_name = os.path.join(root, folder)
             try:
                 link = codes[folder]
             except KeyError:
                 print("Error: idx not found")
+                try:
+                    os.remove(folder_name)
+                except PermissionError:
+                    pass
                 continue
             if link.endswith("/"):
                 link = link[:-1]
             idx = link[link.rfind("/")+1:]
             print(f"{idx=}")
             filename = os.path.join(targetfolder, idx+".torrent")
-            folder_name = os.path.join(root, folder)
             for file in os.listdir(folder_name):
                 if not file.endswith(".ico"):
                     try:

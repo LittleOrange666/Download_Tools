@@ -1,6 +1,8 @@
 import codecs
 import os
 import subprocess
+import glob
+from PIL import Image
 
 os.chdir(os.path.dirname(__file__))
 with open("book_dictionary", encoding="utf8") as f:
@@ -19,7 +21,7 @@ Vid=\r\n
 FolderType=Pictures\r\n
 '''
 Any2Ico_path = 'Quick_Any2Ico.exe'
-ext = ["jpg", "jpeg", "png", "gif", "icns", "ico"]
+ext = ["jpg", "jpeg", "png", "gif", "icns", "ico", "webp"]
 datf = "dat.json"
 
 if __name__ == "__main__":
@@ -38,11 +40,25 @@ if __name__ == "__main__":
     for parent, dirnames, filenames in os.walk(root):
         if not dirnames and os.path.getctime(parent) > ot:
             print(parent)
-            first = min(p for p in os.listdir(parent) if p.split(".")[-1].lower() in ext)
+            al = [p for p in os.listdir(parent) if p.split(".")[-1].lower() in ext]
+            if len(al)==0:
+                print(f"{parent} faild")
+                continue
+            first = min(al)
+            use_webp = False
+            if first.endswith("webp"):
+                use_webp = True
+                filename = f"{parent}\\{first}"
+                im = Image.open(filename)
+                save_name = filename.replace('webp', 'png')
+                im.save('{}'.format(save_name), 'PNG')
+                first = first[:-4]+"png"
             if os.path.exists('{0}/icon.ico'.format(parent)):
                 os.remove('{0}/icon.ico'.format(parent))
             cmd = '"{0}" "-img={1}\\{2}" "-icon={1}\\icon.ico"'.format(Any2Ico_path, parent, first)
             subprocess.run(cmd)
+            if use_webp:
+                os.remove(f"{parent}\\{first}")
             win32api.SetFileAttributes('{0}/icon.ico'.format(parent), win32con.FILE_ATTRIBUTE_HIDDEN)
             desktop_ini = '{0}/desktop.ini'.format(parent)
             if os.path.exists(desktop_ini):
