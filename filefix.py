@@ -9,7 +9,14 @@ with open("book_dictionary", encoding="utf8") as f:
 with open("torrent_dictionary", encoding="utf8") as f:
     targetfolder = f.read()
 
+qbittorrent = r'"C:\Program Files\qBittorrent\qbittorrent.exe"'
+
 if __name__ == "__main__":
+    btstat = subprocess.Popen('tasklist /FI "IMAGENAME eq qBittorrent.exe"',
+                              stdout=subprocess.PIPE).communicate()[0].decode("cp950")
+    if "exe" not in btstat:
+        subprocess.Popen(qbittorrent)
+        print("try opening Bittorrent")
     total = len(os.listdir(root))
     cnt = 0
     with open("codes.json", encoding="utf8") as f:

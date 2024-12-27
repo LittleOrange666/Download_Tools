@@ -49,9 +49,13 @@ if __name__ == "__main__":
             if first.endswith("webp"):
                 use_webp = True
                 filename = f"{parent}\\{first}"
-                im = Image.open(filename)
                 save_name = filename.replace('webp', 'png')
-                im.save('{}'.format(save_name), 'PNG')
+                try:
+                    im = Image.open(filename)
+                    im.save('{}'.format(save_name), 'PNG')
+                except:
+                    print("webp convert Error!")
+                    continue # skip error
                 first = first[:-4]+"png"
             if os.path.exists('{0}/icon.ico'.format(parent)):
                 os.remove('{0}/icon.ico'.format(parent))
