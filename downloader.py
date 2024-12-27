@@ -1,17 +1,16 @@
 # -*-coding:utf-8 -*-
 import json
 import os
-import time
 import shutil
-import requests
 import subprocess
-import re
+import time
+import traceback
+from multiprocessing import Lock
 
+import requests
 import win32api
 import win32con
 
-import traceback
-from multiprocessing import Process, Lock
 os.chdir(os.path.dirname(__file__))
 with open("book_dictionary", encoding="utf8") as f:
     root = f.read()
@@ -23,6 +22,7 @@ from flask_apscheduler import APScheduler
 from torrentool.api import Torrent
 from torrentool.exceptions import BencodeDecodingError
 from multiprocessing import Process, Queue
+
 lock = Lock()
 app = Flask(__name__)
 lasttime = -1
@@ -30,6 +30,7 @@ qbittorrent = r'"C:\Program Files\qBittorrent\qbittorrent.exe"'
 book_reader = r"..\Book_Reader"
 q = Queue()
 hashes = []
+
 
 def secure_filename(v):
     for ch in r'\/:*?"<>|':
@@ -114,7 +115,7 @@ def download(trying=False):
             print(f"{source}: {tor.name}")
             with open("codes.json", "w") as f:
                 json.dump(obj, f, indent=2, sort_keys=True)
-            with open(os.path.join(book_reader,"codes.json"), "w") as f:
+            with open(os.path.join(book_reader, "codes.json"), "w") as f:
                 json.dump(obj, f, indent=2, sort_keys=True)
             hashes.append(tor.info_hash)
         except BencodeDecodingError as e:
@@ -123,7 +124,8 @@ def download(trying=False):
             return Response(response="Fail to analyze torrent file", status=200)
         except json.decoder.JSONDecodeError:
             lock.release()
-            return Response(response="Some Error occured, this could be caused by requests with too short intervals", status=200)
+            return Response(response="Some Error occured, this could be caused by requests with too short intervals",
+                            status=200)
         except BaseException:
             lock.release()
             raise

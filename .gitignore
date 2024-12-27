@@ -1,5 +1,4 @@
-dat.json
-codes.json
+*.json
 torrent_dictionary
 book_dictionary
 .idea/
