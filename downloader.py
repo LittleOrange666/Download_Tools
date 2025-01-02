@@ -21,7 +21,8 @@ from flask_cors import cross_origin
 from flask_apscheduler import APScheduler
 from torrentool.api import Torrent
 from torrentool.exceptions import BencodeDecodingError
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
+import force_download
 
 lock = Lock()
 app = Flask(__name__)
@@ -67,6 +68,17 @@ def checker():
             for h in hashes:
                 q.put(h)
             hashes.clear()
+        else:
+            output = subprocess.check_output("qbt torrent list -F csv -f stalledDownloading", shell=True, text=True)
+            ls = output.split("\n")
+            if len(ls) <= 1:
+                return
+            h = ls[1].split(",")[0]
+            with fd_info_lock:
+                o = fd_info.get(h, None)
+            if o is not None:
+                print(f"force downloading {o[0]} {len(o[2])} {o[1]}")
+                force_download.resolve(o[0], o[1], o[2], h)
 
 
 @app.route('/download', methods=['POST'])
@@ -98,6 +110,8 @@ def download(trying=False):
         try:
             tor = Torrent.from_file(filename)
             fname = secure_filename(tor.name)
+            with fd_info_lock:
+                fd_info[tor.info_hash] = (name, fname, tuple(os.path.basename(o.name) for o in tor.files))
             folder_name = os.path.join(root, fname)
             if os.path.isdir(folder_name):
                 print("Removing old torrent")
@@ -168,6 +182,8 @@ def get_test():
 
 
 if __name__ == '__main__':
+    fd_info = Manager().dict()
+    fd_info_lock = Lock()
     btstat = subprocess.Popen('tasklist /FI "IMAGENAME eq qBittorrent.exe"',
                               stdout=subprocess.PIPE).communicate()[0].decode("cp950")
     if "exe" not in btstat:

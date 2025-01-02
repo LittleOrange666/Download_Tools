@@ -58,6 +58,24 @@ def get_link(idx, page):
     return prefix, fn
 
 
+def resolve(idx, name, fs, hash_val):
+    os.makedirs(os.path.join(root, name), exist_ok=True)
+    prefix, fn = get_link(idx, 1)
+
+    def download_file(file):
+        link = prefix + file.lstrip("0")
+        path = os.path.join(root, name, file)
+        return download(link, path)
+
+    with ThreadPoolExecutor() as executor:
+        results = list(tqdm(executor.map(download_file, fs), total=len(fs)))
+
+    if all(results):
+        os.system(f"qbt torrent delete {hash_val}")
+    else:
+        print("Failed to download")
+
+
 def main():
     id_map = {}
     t0 = time.time() - 3600 * 24 * 7 * 10
@@ -81,31 +99,14 @@ def main():
     dat = [line for line in dat if line[0] in id_map]
     dat.sort(key=lambda x: id_map[x[0]][3])
 
-    def resolve(idx, name, fs):
-        prefix, fn = get_link(idx, 1)
-
-        def download_file(file):
-            link = prefix + file.lstrip("0")
-            path = os.path.join(root, name, file)
-            return download(link, path)
-
-        with ThreadPoolExecutor() as executor:
-            results = list(tqdm(executor.map(download_file, fs), total=len(fs)))
-
-        if all(results):
-            os.system(f"qbt torrent delete {line[0]}")
-        else:
-            print("Failed to download")
-
     for line in dat:
         info = id_map[line[0]]
         idx = info[0][:-8]
         cnt = info[1]
         name = info[2]
         fs = info[4]
-        os.makedirs(os.path.join(root, name), exist_ok=True)
         print(f"{idx} {cnt} {name}")
-        resolve(idx, name, fs)
+        resolve(idx, name, fs, line[0])
     os.system(r"python makeicon.py")
 
 
