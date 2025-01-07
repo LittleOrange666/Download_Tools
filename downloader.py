@@ -123,6 +123,7 @@ def download(trying=False):
                     return Response(status=204)
                 except FileNotFoundError:
                     pass
+            os.makedirs(folder_name, exist_ok=True)
             with open("codes.json") as f:
                 obj = json.load(f)
             obj[source] = tor.name
