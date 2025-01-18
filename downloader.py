@@ -85,7 +85,6 @@ def checker():
 @cross_origin()
 def download(trying=False):
     global lasttime
-    # cookie = request.form['cookie']
     name = request.form['name']
     url = request.form['target']
     source = request.form['source']
@@ -99,6 +98,10 @@ def download(trying=False):
         response = requests.get(url, headers=headers)
         if response.status_code == 403:
             return Response(response="Cookie may be expired, please update it and try again", status=200)
+        elif response.status_code == 500:
+            print("Server Error, retrying...")
+            time.sleep(2)
+            return download(True)
         elif response.status_code != 200:
             return Response(response=f"link {url!r} get {response.status_code} response", status=200)
         try:
@@ -106,61 +109,54 @@ def download(trying=False):
         except PermissionError:
             print("Action failed, pass it")
             return Response(status=204)
-        lock.acquire()
         try:
             tor = Torrent.from_file(filename)
             fname = secure_filename(tor.name)
             with fd_info_lock:
                 fd_info[tor.info_hash] = (name, fname, tuple(os.path.basename(o.name) for o in tor.files))
             folder_name = os.path.join(root, fname)
-            if os.path.isdir(folder_name):
-                print("Removing old torrent")
-                win32api.SetFileAttributes(folder_name, win32con.FILE_ATTRIBUTE_DIRECTORY)
-                try:
-                    shutil.rmtree(folder_name)
-                except PermissionError:
-                    print("Remove failed, pass it")
-                    return Response(status=204)
-                except FileNotFoundError:
-                    pass
-            os.makedirs(folder_name, exist_ok=True)
-            with open("codes.json") as f:
-                obj = json.load(f)
-            obj[source] = tor.name
-            print(f"{source}: {tor.name}")
-            with open("codes.json", "w") as f:
-                json.dump(obj, f, indent=2, sort_keys=True)
-            with open(os.path.join(book_reader, "codes.json"), "w") as f:
-                json.dump(obj, f, indent=2, sort_keys=True)
-            hashes.append(tor.info_hash)
+            with lock:
+                if os.path.isdir(folder_name):
+                    print("Removing old torrent")
+                    win32api.SetFileAttributes(folder_name, win32con.FILE_ATTRIBUTE_DIRECTORY)
+                    try:
+                        shutil.rmtree(folder_name)
+                    except PermissionError:
+                        print("Remove failed, pass it")
+                        return Response(status=204)
+                    except FileNotFoundError:
+                        pass
+                os.makedirs(folder_name, exist_ok=True)
+                with open("codes.json") as f:
+                    obj = json.load(f)
+                obj[source] = tor.name
+                print(f"{source}: {tor.name}")
+                with open("codes.json", "w") as f:
+                    json.dump(obj, f, indent=2, sort_keys=True)
+                with open(os.path.join(book_reader, "codes.json"), "w") as f:
+                    json.dump(obj, f, indent=2, sort_keys=True)
+                hashes.append(tor.info_hash)
         except BencodeDecodingError as e:
             traceback.print_exception(e)
-            lock.release()
             return Response(response="Fail to analyze torrent file", status=200)
         except json.decoder.JSONDecodeError:
-            lock.release()
             return Response(response="Some Error occured, this could be caused by requests with too short intervals",
                             status=200)
         except BaseException:
-            lock.release()
             raise
-        lock.release()
         cmd = f"qbt torrent add file \"{filename}\""
         print(cmd)
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         process.wait()
         result = process.poll()
         if result:
-            out = process.communicate()[1].decode("cp950")
+            out = process.communicate()[1]
             res = "Unknown Error occurred"
             if "Unsupported Media Type" in out:
                 res = "Cookie may be expired, please update it and try again"
             else:
-                btstat = \
-                    subprocess.Popen('tasklist /FI "IMAGENAME eq qBittorrent.exe"',
-                                     stdout=subprocess.PIPE).communicate()[
-                        0].decode("cp950")
-                if "exe" not in btstat:
+                btstat0 = subprocess.check_output('tasklist /FI "IMAGENAME eq qBittorrent.exe"')
+                if "exe" not in btstat0:
                     if trying:
                         res = "Cannot opening Bittorrent"
                     else:
