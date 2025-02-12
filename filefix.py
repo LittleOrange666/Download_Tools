@@ -65,3 +65,4 @@ if __name__ == "__main__":
             result = process.poll()
         cnt += 1
         print(f"{cnt}/{total}")
+    os.system("python force_download.py")

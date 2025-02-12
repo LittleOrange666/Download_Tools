@@ -29,6 +29,7 @@ app = Flask(__name__)
 lasttime = -1
 qbittorrent = r'"C:\Program Files\qBittorrent\qbittorrent.exe"'
 book_reader = r"..\Book_Reader"
+use_force_download = False
 q = Queue()
 hashes = []
 
@@ -59,8 +60,11 @@ scheduler = APScheduler()
 def checker():
     global lasttime
     if lasttime != -1 and time.time() > 10 + lasttime:
-        out = subprocess.Popen("qbt torrent list -f downloading -F list", stdout=subprocess.PIPE).communicate()[
-            0].decode("cp950")
+        res = subprocess.run("qbt torrent list -f downloading -F list", stdout=subprocess.PIPE, text=True)
+        out, err = res.stdout, res.stderr
+        if err:
+            print("Error: "+err)
+            return
         if len(out) == 0:
             print("try make icon")
             os.system(r"python makeicon.py")
@@ -68,7 +72,7 @@ def checker():
             for h in hashes:
                 q.put(h)
             hashes.clear()
-        else:
+        elif use_force_download:
             output = subprocess.check_output("qbt torrent list -F csv -f stalledDownloading", shell=True, text=True)
             ls = output.split("\n")
             if len(ls) <= 1:
@@ -155,7 +159,7 @@ def download(trying=False):
             if "Unsupported Media Type" in out:
                 res = "Cookie may be expired, please update it and try again"
             else:
-                btstat0 = subprocess.check_output('tasklist /FI "IMAGENAME eq qBittorrent.exe"')
+                btstat0 = subprocess.check_output('tasklist /FI "IMAGENAME eq qBittorrent.exe"', text=True)
                 if "exe" not in btstat0:
                     if trying:
                         res = "Cannot opening Bittorrent"
@@ -166,6 +170,7 @@ def download(trying=False):
                         return download(True)
             print(out)
             return Response(response=res, status=200)
+        # os.startfile(filename)
         lasttime = time.time()
         return Response(status=204)
     else:

@@ -61,6 +61,7 @@ def get_link(idx, page):
 def resolve(idx, name, fs, hash_val):
     os.makedirs(os.path.join(root, name), exist_ok=True)
     prefix, fn = get_link(idx, 1)
+    print(f"{prefix=}")
 
     def download_file(file):
         link = prefix + file.lstrip("0")
