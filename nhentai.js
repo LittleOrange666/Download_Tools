@@ -32,7 +32,40 @@
     function settargets(v){
         sessionStorage.targets = v.toString();
     }
+    async function new_download(link){
+        if (!link) link = location.href;
+        if (!link.endsWith("/")) link += "/";
+        let name = link.substring(22,28);
+        let res1 = await fetch(link+"download");
+        if (!res1.ok) {
+            window.alert("Failed to download torrent");
+            return false;
+        }
+        let blob = await res1.blob();
+        let form = new FormData();
+        form.append("name", name);
+        form.append("source", link);
+        form.append("target", link+"download");
+        form.append("cookie", localStorage.THE_COOKIE);
+        form.append("UserAgent", navigator.userAgent);
+        form.append("file", blob, name+".torrent");
+        let res2 = await fetch(downloader+'/download', {
+            method: "POST",
+            body: form
+        });
+        if (!res2.ok) {
+            window.alert("Failed to upload torrent");
+            return false;
+        }
+        if (res2.status !== 204) {
+            let data = await res2.text();
+            window.alert(data);
+            return false;
+        }
+        return true;
+    }
     function download(link, callback, error_callback){
+        /*
         if (!link) link = location.href;
         if (!link.endsWith("/")) link += "/";
         name = link.substring(22,28);
@@ -60,6 +93,16 @@
                     }
                     if (callback instanceof Function) callback();
                 }
+            }
+        });*/
+        new_download(link).then(function(success){
+            if (success) {
+                if (sessionStorage.isr && location.pathname.startsWith("/g")) {
+                    applyrandom();
+                }
+                if (callback instanceof Function) callback();
+            } else {
+                if (error_callback instanceof Function) error_callback();
             }
         });
     }

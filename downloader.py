@@ -72,6 +72,7 @@ def checker():
             for h in hashes:
                 q.put(h)
             hashes.clear()
+            os.system(r"python ../Book_reader/create_names.py")
         elif use_force_download:
             output = subprocess.check_output("qbt torrent list -F csv -f stalledDownloading", shell=True, text=True)
             ls = output.split("\n")
@@ -94,27 +95,35 @@ def download(trying=False):
     source = request.form['source']
     filename = name + ".torrent"
     filename = os.path.join(targetfolder, filename)
-    if request.form['cookie'] != "undefined":
+    has_file = "file" in request.files
+    if request.form['cookie'] != "undefined" or has_file:
         headers = {
-            "cookie": request.form['cookie'],
+            "cookie": request.form['cookie'].strip(),
             "User-Agent": request.form['UserAgent']
         }
-        response = requests.get(url, headers=headers)
-        if response.status_code == 403:
-            return Response(response="Cookie may be expired, please update it and try again", status=200)
-        elif response.status_code == 500:
-            print("Server Error, retrying...")
-            time.sleep(2)
-            return download(True)
-        elif response.status_code != 200:
-            return Response(response=f"link {url!r} get {response.status_code} response", status=200)
+        if has_file:
+            file = request.files['file']
+            file_content = file.stream.read()
+        else:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 403:
+                return Response(response="Cookie may be expired, please update it and try again", status=200)
+            elif response.status_code == 500:
+                print("Server Error, retrying...")
+                time.sleep(2)
+                return download(True)
+            elif response.status_code != 200:
+                return Response(response=f"link {url!r} get {response.status_code} response", status=200)
+            file_content = response.content
         try:
-            open(filename, "wb").write(response.content)
+            open(filename, "wb").write(file_content)
         except PermissionError:
             print("Action failed, pass it")
             return Response(status=204)
         try:
             tor = Torrent.from_file(filename)
+            if tor.name is None:
+                return Response(response="Fail to analyze torrent file", status=200)
             fname = secure_filename(tor.name)
             with fd_info_lock:
                 fd_info[tor.info_hash] = (name, fname, tuple(os.path.basename(o.name) for o in tor.files))
@@ -137,7 +146,7 @@ def download(trying=False):
                 print(f"{source}: {tor.name}")
                 with open("codes.json", "w") as f:
                     json.dump(obj, f, indent=2, sort_keys=True)
-                with open(os.path.join(book_reader, "codes.json"), "w") as f:
+                with open(os.path.join(book_reader, "data", "codes.json"), "w") as f:
                     json.dump(obj, f, indent=2, sort_keys=True)
                 hashes.append(tor.info_hash)
         except BencodeDecodingError as e:
@@ -157,7 +166,7 @@ def download(trying=False):
             out = process.communicate()[1]
             res = "Unknown Error occurred"
             if "Unsupported Media Type" in out:
-                res = "Cookie may be expired, please update it and try again"
+                res = "Parse failed, cookie may be expired, please update it and try again"
             else:
                 btstat0 = subprocess.check_output('tasklist /FI "IMAGENAME eq qBittorrent.exe"', text=True)
                 if "exe" not in btstat0:
